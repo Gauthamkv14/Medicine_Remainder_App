@@ -12,6 +12,9 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+
+        // This is needed for instrumented tests (tests that run on a device/emulator)
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -28,10 +31,18 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'com.google.android.material:material:1.12.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
-    implementation 'androidx.recyclerview:recyclerview:1.4.0'
-    implementation 'androidx.room:room-runtime:2.6.1'
-    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+    // Dependencies for your app's main source code
+    implementation libs.androidx.appcompat
+    implementation libs.google.material
+    implementation libs.androidx.constraintlayout
+    implementation libs.androidx.recyclerview
+    implementation libs.androidx.room.runtime
+    annotationProcessor libs.androidx.room.compiler
+
+    // Dependency for local unit tests (like ExampleUnitTest.java)
+    testImplementation libs.junit
+
+    // Dependencies for instrumented tests (UI tests)
+    androidTestImplementation libs.ext.junit // This is the corrected line
+    androidTestImplementation libs.espresso.core
 }

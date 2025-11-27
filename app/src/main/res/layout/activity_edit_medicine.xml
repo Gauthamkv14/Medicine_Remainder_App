@@ -1,30 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scroll_edit"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@android:color/white"
     tools:context=".EditMedicineActivity">
 
-    <!-- Header -->
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="✏️ Edit Medicine"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="#3F51B5"
-        android:gravity="center"
-        android:padding="24dp"
-        android:background="#E8EAF6" />
+        android:orientation="vertical">
 
-    <!-- Form Content -->
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
+        <!-- Header -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="✏️ Edit Medicine"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#3F51B5"
+            android:gravity="center"
+            android:padding="24dp"
+            android:background="#E8EAF6" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -33,68 +31,116 @@
             android:padding="24dp">
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:hint="Medicine Name"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                android:hint="Medicine Name">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/editMedicineName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textCapWords"
-                    android:drawableStart="@android:drawable/ic_menu_today"
-                    android:drawablePadding="12dp"
-                    android:padding="16dp" />
-
+                    android:padding="12dp" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <TextView
+                android:id="@+id/editTimesText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                android:hint="Select Time"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                android:text="Times: none"
+                android:textSize="14sp"
+                android:textColor="@android:color/darker_gray"
+                android:layout_marginTop="8dp" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/editMedicineTime"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:focusable="false"
-                    android:clickable="true"
-                    android:drawableStart="@android:drawable/ic_menu_recent_history"
-                    android:drawablePadding="12dp"
-                    android:padding="16dp" />
-
-            </com.google.android.material.textfield.TextInputLayout>
+            <Button
+                android:id="@+id/addTimeBtnEdit"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add time"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="Repeat type"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="6dp"/>
+
+            <Spinner
+                android:id="@+id/repeatSpinnerEdit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Every X days (for EVERY_X)"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/intervalEditEdit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:padding="12dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Weekday checkboxes -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Weekly days (for WEEKLY)" android:textStyle="bold" android:layout_marginTop="4dp" />
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <CheckBox android:id="@+id/cbMonEdit" android:text="Mon"/>
+                <CheckBox android:id="@+id/cbTueEdit" android:text="Tue"/>
+                <CheckBox android:id="@+id/cbWedEdit" android:text="Wed"/>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                <CheckBox android:id="@+id/cbThuEdit" android:text="Thu"/>
+                <CheckBox android:id="@+id/cbFriEdit" android:text="Fri"/>
+                <CheckBox android:id="@+id/cbSatEdit" android:text="Sat"/>
+            </LinearLayout>
+
+            <CheckBox android:id="@+id/cbSunEdit" android:text="Sun" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Food timing" android:textStyle="bold" android:layout_marginTop="12dp" />
+
+            <Spinner android:id="@+id/foodSpinnerEdit" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Severity" android:textStyle="bold" android:layout_marginTop="12dp" />
+
+            <Spinner android:id="@+id/severitySpinnerEdit" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="🔔 The reminder will be rescheduled to the new time"
                 android:textSize="14sp"
                 android:textColor="@android:color/darker_gray"
-                android:layout_gravity="center"
-                android:gravity="center"
-                android:layout_marginBottom="24dp" />
+                android:layout_marginTop="16dp"/>
 
         </LinearLayout>
 
-    </ScrollView>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp">
+            <Button
+                android:id="@+id/updateButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="☑️  Edit Changes"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/white"
+                android:backgroundTint="#9C88FF"
+                android:padding="14dp" />
+        </LinearLayout>
 
-    <!-- Update Button at Bottom -->
-    <Button
-        android:id="@+id/updateButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="☑️  Edit Changes"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="@android:color/white"
-        android:backgroundTint="#9C88FF"
-        android:padding="18dp"
-        android:layout_margin="16dp"
-        android:elevation="8dp"/>
-
-</LinearLayout>
+    </LinearLayout>
+</ScrollView>

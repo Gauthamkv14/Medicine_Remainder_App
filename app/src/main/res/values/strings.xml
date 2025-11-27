@@ -1,4 +1,25 @@
 <resources>
     <string name="app_name">MedicRemainder1</string>
     <string name="add_medicine">Add Medicine</string>
+    <string name="repeat_prompt">Select repeat type</string>
+    <string name="food_prompt">Select food timing</string>
+    <string name="severity_prompt">Select severity</string>
+
+    <string-array name="repeat_options">
+        <item>DAILY</item>
+        <item>EVERY_X</item>
+        <item>WEEKLY</item>
+    </string-array>
+
+    <string-array name="food_options">
+        <item>NONE</item>
+        <item>BEFORE</item>
+        <item>AFTER</item>
+    </string-array>
+
+    <string-array name="severity_options">
+        <item>LOW</item>
+        <item>MEDIUM</item>
+        <item>HIGH</item>
+    </string-array>
 </resources>

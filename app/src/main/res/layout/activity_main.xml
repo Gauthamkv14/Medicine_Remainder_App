@@ -40,11 +40,29 @@
 
         </LinearLayout>
 
+        <!-- Timetable button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/btnTimetable"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="View Timetable"
+                android:backgroundTint="#6366F1"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
         <!-- Medicines List -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:padding="8dp"
             android:clipToPadding="false"/>
 
