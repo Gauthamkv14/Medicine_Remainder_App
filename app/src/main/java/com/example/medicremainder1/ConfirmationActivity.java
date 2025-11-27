@@ -1,20 +1,20 @@
 package com.example.medicremainder1;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
- * Activity displayed when the user taps notification to confirm Taken or Not taken.
+ * ConfirmationActivity - user confirms Taken or Not taken for a schedule entry
+ * Expects extra: "schedule_id" (int)
  */
 public class ConfirmationActivity extends AppCompatActivity {
-    private int scheduleId;
-    private int medId;
+
+    private int scheduleId = -1;
     private DatabaseHelper db;
+    private TextView confirmText;
+    private Button btnTaken, btnNot;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,16 +22,23 @@ public class ConfirmationActivity extends AppCompatActivity {
         setContentView(R.layout.activity_confirmation);
 
         db = new DatabaseHelper(this);
+        confirmText = findViewById(R.id.confirmText);
+        btnTaken = findViewById(R.id.btnTaken);
+        btnNot = findViewById(R.id.btnNotTaken);
 
         scheduleId = getIntent().getIntExtra("schedule_id", -1);
-        medId = getIntent().getIntExtra("med_id", -1);
+        if (scheduleId == -1) {
+            finish();
+            return;
+        }
 
-        TextView txt = findViewById(R.id.confirmText);
-        Button btnTaken = findViewById(R.id.btnTaken);
-        Button btnNot = findViewById(R.id.btnNotTaken);
-
-        String medName = (medId == -1) ? "Medicine" : db.getMedicineById(medId).name;
-        txt.setText("Did you take " + medName + "?");
+        DatabaseHelper.ScheduleEntry s = db.getScheduleEntryById(scheduleId);
+        String medName = "Medicine";
+        if (s != null) {
+            DatabaseHelper.MedicineDef md = db.getMedicineById(s.medId);
+            if (md != null) medName = md.name;
+            confirmText.setText("Did you take " + medName + " at " + s.time + " ?");
+        }
 
         btnTaken.setOnClickListener(v -> {
             db.markTaken(scheduleId);

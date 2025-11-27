@@ -2,10 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.medicremainder1">
 
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Required for alarms and boot events -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <application
         android:allowBackup="true"
@@ -15,26 +16,64 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MedicRemainder1">
 
-        <activity android:name=".MainActivity" android:exported="true">
+        <!-- MAIN LAUNCH ACTIVITY -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
         </activity>
 
-        <activity android:name=".AddMedicineActivity" android:parentActivityName=".MainActivity" />
-        <activity android:name=".EditMedicineActivity" android:parentActivityName=".MainActivity" />
-        <activity android:name=".TimetableActivity" />
-        <activity android:name=".ConfirmationActivity" />
+        <!-- OTHER ACTIVITIES -->
+        <activity
+            android:name=".AddMedicineActivity"
+            android:parentActivityName=".MainActivity"
+            android:exported="false"/>
 
-        <!-- Receivers -->
-        <receiver android:name=".AlarmReceiver" android:exported="true" />
-        <receiver android:name=".MissReceiver" android:exported="false" />
-        <receiver android:name=".SnoozeReceiver" android:exported="false" />
-        <receiver android:name=".BootReceiver" android:exported="true">
+        <activity
+            android:name=".EditMedicineActivity"
+            android:parentActivityName=".MainActivity"
+            android:exported="false"/>
+
+        <activity
+            android:name=".TimetableActivity"
+            android:exported="false"/>
+
+        <activity
+            android:name=".ConfirmationActivity"
+            android:exported="false"/>
+
+        <!-- RECEIVERS -->
+
+        <!-- Fired exactly at medicine time -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false"/>
+
+        <!-- Fired 30 minutes later to mark MISSED if still PENDING -->
+        <receiver
+            android:name=".MissReceiver"
+            android:exported="false"/>
+
+        <!-- Optional snooze receiver -->
+        <receiver
+            android:name=".SnoozeReceiver"
+            android:exported="false"/>
+
+        <!-- Re-registers all alarms after device reboot -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
+
         </receiver>
 
     </application>

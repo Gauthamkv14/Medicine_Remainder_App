@@ -12,8 +12,6 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
-
-        // This is needed for instrumented tests (tests that run on a device/emulator)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -31,18 +29,16 @@ android {
 }
 
 dependencies {
-    // Dependencies for your app's main source code
-    implementation libs.androidx.appcompat
-    implementation libs.google.material
-    implementation libs.androidx.constraintlayout
-    implementation libs.androidx.recyclerview
-    implementation libs.androidx.room.runtime
-    annotationProcessor libs.androidx.room.compiler
+    // MAIN APP
+    implementation(libs.androidx.appcompat)
+    implementation(libs.google.material)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.recyclerview)   // <-- THIS MUST EXIST IN TOML
+    implementation(libs.androidx.room.runtime)
+    annotationProcessor(libs.androidx.room.compiler)
 
-    // Dependency for local unit tests (like ExampleUnitTest.java)
-    testImplementation libs.junit
-
-    // Dependencies for instrumented tests (UI tests)
-    androidTestImplementation libs.ext.junit // This is the corrected line
-    androidTestImplementation libs.espresso.core
+    // TESTING
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.ext.junit)
+    androidTestImplementation(libs.espresso.core)
 }

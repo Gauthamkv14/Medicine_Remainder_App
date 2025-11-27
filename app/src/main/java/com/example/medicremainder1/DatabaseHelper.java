@@ -12,71 +12,68 @@ import androidx.annotation.Nullable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * UPDATED DatabaseHelper:
- * - medicines table now holds repeat rules and times (times stored as comma-separated "HH:mm" strings)
- * - schedule_entries table stores one scheduled dose per date/time with status (PENDING/TAKEN/MISSED)
+ * DatabaseHelper - final version for MedicRemainder1
+ *
+ * - Tables:
+ *    medicines (T_MED)
+ *    schedule_entries (T_SCH)  -- rolling 7-day schedule generated from medicines
+ *
+ * - DTOs:
+ *    MedicineDef, ScheduleEntry
+ *
+ * - Important: column / method names are chosen to match usages across the project.
  */
 public class DatabaseHelper extends SQLiteOpenHelper {
-    private static final String TAG = "DB_HELPER";
-
+    private static final String TAG = "DatabaseHelper";
     private static final String DATABASE_NAME = "medic_remainder.db";
-    private static final int DATABASE_VERSION = 3; // bump version if you already have an older DB
+    private static final int DATABASE_VERSION = 6;
 
-    // medicines table
+    // --- medicines table
     public static final String T_MED = "medicines";
     public static final String M_ID = "id";
     public static final String M_NAME = "name";
-    public static final String M_TIMES = "times"; // comma-separated times "08:00,14:00,20:00"
-    public static final String M_REPEAT_TYPE = "repeat_type"; // "DAILY","EVERY_X","WEEKLY"
-    public static final String M_REPEAT_INTERVAL = "repeat_interval"; // integer (days)
-    public static final String M_DAYS_BITMAP = "days_bitmap"; // for weekly: bitmask Mon=1<<0 ... Sun=1<<6
-    public static final String M_DURATION_DAYS = "duration_days"; // how many days to create schedule for (default 7)
-    public static final String M_FOOD = "food_timing"; // "BEFORE","AFTER","NONE"
-    public static final String M_SEVERITY = "severity"; // "LOW","MEDIUM","HIGH"
+    public static final String M_TIMES = "times";         // CSV "08:00,14:00"
+    public static final String M_DAYS_BITMAP = "days_bitmap";
+    public static final String M_FOOD = "food_timing";    // NONE/BEFORE/AFTER
 
-    // schedule entries
+    // --- schedule table (rolling 7-day)
     public static final String T_SCH = "schedule_entries";
     public static final String S_ID = "id";
     public static final String S_MED_ID = "medicine_id";
-    public static final String S_DATE = "date_iso"; // yyyy-MM-dd
-    public static final String S_TIME = "time"; // HH:mm
-    public static final String S_TIMESTAMP = "time_in_millis"; // exact timestamp to schedule alarm
-    public static final String S_STATUS = "status"; // "PENDING","TAKEN","MISSED"
-    public static final String S_AUTO_MISS_TS = "auto_miss_ts"; // timestamp when auto miss will be executed (nullable)
+    public static final String S_DATE = "date_iso";           // yyyy-MM-dd
+    public static final String S_TIME = "time";               // HH:mm
+    public static final String S_TIMESTAMP = "time_in_millis";
+    public static final String S_STATUS = "status";           // PENDING / TAKEN / MISSED
+    public static final String S_FOOD = "food_timing";
 
-    public DatabaseHelper(@Nullable Context context) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    public DatabaseHelper(@Nullable Context ctx) {
+        super(ctx, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
+    // ---------------------- CREATE / UPGRADE ----------------------
     @Override
     public void onCreate(SQLiteDatabase db) {
-        // medicines table
         String createMed = "CREATE TABLE " + T_MED + " (" +
-                M_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                M_NAME + " TEXT," +
-                M_TIMES + " TEXT," +
-                M_REPEAT_TYPE + " TEXT," +
-                M_REPEAT_INTERVAL + " INTEGER DEFAULT 1," +
-                M_DAYS_BITMAP + " INTEGER DEFAULT 0," +
-                M_DURATION_DAYS + " INTEGER DEFAULT 7," +
-                M_FOOD + " TEXT DEFAULT 'NONE'," +
-                M_SEVERITY + " TEXT DEFAULT 'LOW'" +
+                M_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                M_NAME + " TEXT, " +
+                M_TIMES + " TEXT, " +
+                M_DAYS_BITMAP + " INTEGER DEFAULT 127, " + // default all days
+                M_FOOD + " TEXT DEFAULT 'NONE'" +
                 ")";
         db.execSQL(createMed);
 
-        // schedule entries
         String createSch = "CREATE TABLE " + T_SCH + " (" +
-                S_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                S_MED_ID + " INTEGER," +
-                S_DATE + " TEXT," +
-                S_TIME + " TEXT," +
-                S_TIMESTAMP + " INTEGER," +
-                S_STATUS + " TEXT DEFAULT 'PENDING'," +
-                S_AUTO_MISS_TS + " INTEGER," +
+                S_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                S_MED_ID + " INTEGER, " +
+                S_DATE + " TEXT, " +
+                S_TIME + " TEXT, " +
+                S_TIMESTAMP + " INTEGER, " +
+                S_STATUS + " TEXT DEFAULT 'PENDING', " +
+                S_FOOD + " TEXT, " +
                 "FOREIGN KEY(" + S_MED_ID + ") REFERENCES " + T_MED + "(" + M_ID + ")" +
                 ")";
         db.execSQL(createSch);
@@ -84,133 +81,150 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // simple destructive migration for dev: you may want to write real migrations later
-        Log.w(TAG, "Upgrading DB from " + oldVersion + " to " + newVersion + " - dropping tables");
+        Log.w(TAG, "Upgrading DB from " + oldVersion + " to " + newVersion + ", destructive");
         db.execSQL("DROP TABLE IF EXISTS " + T_SCH);
         db.execSQL("DROP TABLE IF EXISTS " + T_MED);
         onCreate(db);
     }
 
-    // ------------ MEDICINES CRUD ----------------
+    // ---------------------- MEDICINES CRUD ----------------------
 
     /**
-     * Insert a medicine and returns its row id
-     * timesCsv example: "08:00,14:00,20:00"
-     * repeatType: "DAILY" | "EVERY_X" | "WEEKLY"
-     * daysBitmap: used for WEEKLY (int bitmask Mon->1<<0 ... Sun->1<<6)
+     * Add medicine. After insert, generate schedule entries for next 7 days.
+     * @param name medicine name
+     * @param timesCsv CSV times "08:00,14:00"
+     * @param daysBitmap bitmask Mon=1<<0 ... Sun=1<<6 (127 = all)
+     * @param foodTiming "NONE"/"BEFORE"/"AFTER"
      */
-    public long addMedicine(String name, String timesCsv, String repeatType, int repeatInterval,
-                            int daysBitmap, int durationDays, String foodTiming, String severity) {
-        SQLiteDatabase db = this.getWritableDatabase();
+    public long addMedicine(String name, String timesCsv, int daysBitmap, String foodTiming) {
+        SQLiteDatabase db = getWritableDatabase();
         ContentValues v = new ContentValues();
         v.put(M_NAME, name);
         v.put(M_TIMES, timesCsv);
-        v.put(M_REPEAT_TYPE, repeatType);
-        v.put(M_REPEAT_INTERVAL, repeatInterval);
         v.put(M_DAYS_BITMAP, daysBitmap);
-        v.put(M_DURATION_DAYS, durationDays);
-        v.put(M_FOOD, foodTiming);
-        v.put(M_SEVERITY, severity);
+        v.put(M_FOOD, foodTiming == null ? "NONE" : foodTiming);
         long id = db.insert(T_MED, null, v);
 
-        // generate schedule entries for next durationDays
-        if (id != -1) {
-            generateScheduleForMedicine((int) id);
-        }
+        if (id != -1) generateScheduleForMedicine((int) id);
         return id;
     }
 
-    public void updateMedicine(int id, String name, String timesCsv, String repeatType, int repeatInterval,
-                               int daysBitmap, int durationDays, String foodTiming, String severity) {
-        SQLiteDatabase db = this.getWritableDatabase();
+    /**
+     * Update medicine and regenerate schedule for next 7 days (replace future entries).
+     */
+    public int updateMedicine(int id, String name, String timesCsv, int daysBitmap, String foodTiming) {
+        SQLiteDatabase db = getWritableDatabase();
         ContentValues v = new ContentValues();
         v.put(M_NAME, name);
         v.put(M_TIMES, timesCsv);
-        v.put(M_REPEAT_TYPE, repeatType);
-        v.put(M_REPEAT_INTERVAL, repeatInterval);
         v.put(M_DAYS_BITMAP, daysBitmap);
-        v.put(M_DURATION_DAYS, durationDays);
-        v.put(M_FOOD, foodTiming);
-        v.put(M_SEVERITY, severity);
-        db.update(T_MED, v, M_ID + "=?", new String[]{String.valueOf(id)});
+        v.put(M_FOOD, foodTiming == null ? "NONE" : foodTiming);
+        int rows = db.update(T_MED, v, M_ID + "=?", new String[]{String.valueOf(id)});
 
-        // regenerate schedule for this med (simpler approach: remove future entries and recreate)
-        deleteFutureScheduleForMed(id);
+        // regenerate schedule for this med
+        deleteScheduleForMedNext7Days(id);
         generateScheduleForMedicine(id);
+        return rows;
     }
 
+    /**
+     * Delete medicine and its schedule entries.
+     */
     public void deleteMedicine(int medId) {
-        SQLiteDatabase db = this.getWritableDatabase();
+        SQLiteDatabase db = getWritableDatabase();
         db.delete(T_MED, M_ID + "=?", new String[]{String.valueOf(medId)});
         db.delete(T_SCH, S_MED_ID + "=?", new String[]{String.valueOf(medId)});
     }
 
+    /**
+     * Return all medicines ordered by id desc (newest first).
+     */
     public List<MedicineDef> getAllMedicines() {
-        List<MedicineDef> list = new ArrayList<>();
+        List<MedicineDef> out = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.query(T_MED, null, null, null, null, null, M_ID + " ASC");
-        if (c.moveToFirst()) {
-            do {
+        Cursor c = db.query(T_MED, null, null, null, null, null, M_ID + " DESC");
+        if (c != null) {
+            if (c.moveToFirst()) {
+                do {
+                    MedicineDef m = new MedicineDef();
+                    m.id = c.getInt(c.getColumnIndexOrThrow(M_ID));
+                    m.name = c.getString(c.getColumnIndexOrThrow(M_NAME));
+                    m.timesCsv = c.getString(c.getColumnIndexOrThrow(M_TIMES));
+                    m.daysBitmap = c.getInt(c.getColumnIndexOrThrow(M_DAYS_BITMAP));
+                    m.foodTiming = c.getString(c.getColumnIndexOrThrow(M_FOOD));
+                    out.add(m);
+                } while (c.moveToNext());
+            }
+            c.close();
+        }
+        return out;
+    }
+
+    /**
+     * Get single medicine by id.
+     */
+    public MedicineDef getMedicineById(int medId) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.query(T_MED, null, M_ID + "=?", new String[]{String.valueOf(medId)}, null, null, null);
+        if (c != null) {
+            if (c.moveToFirst()) {
                 MedicineDef m = new MedicineDef();
                 m.id = c.getInt(c.getColumnIndexOrThrow(M_ID));
                 m.name = c.getString(c.getColumnIndexOrThrow(M_NAME));
                 m.timesCsv = c.getString(c.getColumnIndexOrThrow(M_TIMES));
-                m.repeatType = c.getString(c.getColumnIndexOrThrow(M_REPEAT_TYPE));
-                m.repeatInterval = c.getInt(c.getColumnIndexOrThrow(M_REPEAT_INTERVAL));
                 m.daysBitmap = c.getInt(c.getColumnIndexOrThrow(M_DAYS_BITMAP));
-                m.durationDays = c.getInt(c.getColumnIndexOrThrow(M_DURATION_DAYS));
                 m.foodTiming = c.getString(c.getColumnIndexOrThrow(M_FOOD));
-                m.severity = c.getString(c.getColumnIndexOrThrow(M_SEVERITY));
-                list.add(m);
-            } while (c.moveToNext());
+                c.close();
+                return m;
+            }
+            c.close();
         }
-        c.close();
-        return list;
+        return null;
     }
 
-    // ------------ SCHEDULE MANAGEMENT ----------------
+    // ---------------------- SCHEDULE GENERATION (rolling 7-day) ----------------------
 
     /**
-     * Generate schedule entries for the next durationDays for the given medicine.
-     * This respects repeat_type: DAILY, EVERY_X, WEEKLY (daysBitmap).
+     * Generate schedule entries for the next 7 days for the given medicine.
+     * Skips entries in the past (for today).
      */
     public void generateScheduleForMedicine(int medId) {
         MedicineDef m = getMedicineById(medId);
         if (m == null) return;
 
-        String[] times = m.timesCsv != null ? m.timesCsv.split(",") : new String[0];
+        String[] times = m.timesCsv == null ? new String[0] : m.timesCsv.split(",");
         Calendar cal = Calendar.getInstance();
-        SimpleDateFormat isoDate = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        long now = System.currentTimeMillis();
 
-        for (int d = 0; d < m.durationDays; d++) {
-            // check repeat rule for date
-            if (!shouldCreateForDate(m, cal, d)) {
-                cal.add(Calendar.DATE, 1);
-                continue;
-            }
-
-            String dateStr = isoDate.format(cal.getTime());
-            for (String t : times) {
-                t = t.trim();
-                long timestamp = computeTimestampForDateTime(cal, t);
-                insertScheduleEntry(medId, dateStr, t, timestamp);
+        for (int d = 0; d < 7; d++) {
+            int dow = cal.get(Calendar.DAY_OF_WEEK); // 1=Sun..7=Sat
+            int idx = (dow + 5) % 7; // Mon=0 .. Sun=6
+            boolean include = ((m.daysBitmap >> idx) & 1) == 1;
+            if (include) {
+                String dateIso = iso.format(cal.getTime());
+                for (String t : times) {
+                    t = t.trim();
+                    long ts = computeTimestampForDateTime(cal, t);
+                    if (ts >= now) {
+                        insertScheduleEntry(medId, dateIso, t, ts, m.foodTiming);
+                    }
+                }
             }
             cal.add(Calendar.DATE, 1);
         }
     }
 
-    private boolean shouldCreateForDate(MedicineDef m, Calendar cal, int dayOffset) {
-        // m.repeatType can be "DAILY", "EVERY_X", "WEEKLY"
-        if ("DAILY".equalsIgnoreCase(m.repeatType)) return true;
-        if ("EVERY_X".equalsIgnoreCase(m.repeatType)) {
-            return (dayOffset % Math.max(1, m.repeatInterval)) == 0;
-        }
-        if ("WEEKLY".equalsIgnoreCase(m.repeatType)) {
-            int dow = cal.get(Calendar.DAY_OF_WEEK); // 1=Sun ..7=Sat
-            int idx = (dow + 5) % 7; // convert to Mon=0..Sun=6
-            return ((m.daysBitmap >> idx) & 1) == 1;
-        }
-        return true;
+    private long insertScheduleEntry(int medId, String dateIso, String timeHHmm, long ts, String foodTiming) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues v = new ContentValues();
+        v.put(S_MED_ID, medId);
+        v.put(S_DATE, dateIso);
+        v.put(S_TIME, timeHHmm);
+        v.put(S_TIMESTAMP, ts);
+        v.put(S_STATUS, "PENDING");
+        v.put(S_FOOD, foodTiming == null ? "NONE" : foodTiming);
+        return db.insert(T_SCH, null, v);
     }
 
     private long computeTimestampForDateTime(Calendar dayCal, String hhmm) {
@@ -223,69 +237,129 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             c.set(Calendar.MINUTE, mm);
             c.set(Calendar.SECOND, 0);
             c.set(Calendar.MILLISECOND, 0);
-
-            // if computed time is in past relative to now and day is today, move to future (optional)
-            if (c.getTimeInMillis() < System.currentTimeMillis()) {
-                // keep as-is - scheduling logic in app can decide to show immediate or skip
-            }
             return c.getTimeInMillis();
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
             return dayCal.getTimeInMillis();
         }
     }
 
-    private long insertScheduleEntry(int medId, String dateIso, String timeHHmm, long ts) {
+    private void deleteScheduleForMedNext7Days(int medId) {
         SQLiteDatabase db = getWritableDatabase();
-        ContentValues v = new ContentValues();
-        v.put(S_MED_ID, medId);
-        v.put(S_DATE, dateIso);
-        v.put(S_TIME, timeHHmm);
-        v.put(S_TIMESTAMP, ts);
-        v.put(S_STATUS, "PENDING");
-        long id = db.insert(T_SCH, null, v);
-        return id;
+        SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        Calendar cal = Calendar.getInstance();
+        String start = iso.format(cal.getTime());
+        cal.add(Calendar.DATE, 6);
+        String end = iso.format(cal.getTime());
+        db.delete(T_SCH, S_MED_ID + "=? AND " + S_DATE + ">=? AND " + S_DATE + "<=?",
+                new String[]{String.valueOf(medId), start, end});
     }
 
-    public MedicineDef getMedicineById(int medId) {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.query(T_MED, null, M_ID + "=?", new String[]{String.valueOf(medId)}, null, null, null);
-        if (!c.moveToFirst()) { c.close(); return null; }
-        MedicineDef m = new MedicineDef();
-        m.id = c.getInt(c.getColumnIndexOrThrow(M_ID));
-        m.name = c.getString(c.getColumnIndexOrThrow(M_NAME));
-        m.timesCsv = c.getString(c.getColumnIndexOrThrow(M_TIMES));
-        m.repeatType = c.getString(c.getColumnIndexOrThrow(M_REPEAT_TYPE));
-        m.repeatInterval = c.getInt(c.getColumnIndexOrThrow(M_REPEAT_INTERVAL));
-        m.daysBitmap = c.getInt(c.getColumnIndexOrThrow(M_DAYS_BITMAP));
-        m.durationDays = c.getInt(c.getColumnIndexOrThrow(M_DURATION_DAYS));
-        m.foodTiming = c.getString(c.getColumnIndexOrThrow(M_FOOD));
-        m.severity = c.getString(c.getColumnIndexOrThrow(M_SEVERITY));
-        c.close();
-        return m;
+    /**
+     * Regenerate all schedules for next 7 days (used at app start).
+     * Removes entries in the range [today .. today+6] then recreates.
+     */
+    public void regenerateAllSchedulesForNext7Days() {
+        List<MedicineDef> all = getAllMedicines();
+        SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        Calendar cal = Calendar.getInstance();
+        String start = iso.format(cal.getTime());
+        cal.add(Calendar.DATE, 6);
+        String end = iso.format(cal.getTime());
+
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete(T_SCH, S_DATE + ">=? AND " + S_DATE + "<=?", new String[]{start, end});
+
+        for (MedicineDef m : all) generateScheduleForMedicine(m.id);
     }
 
-    public List<ScheduleEntry> getScheduleForWeek(String startDateIso, String endDateIso) {
+    // ---------------------- QUERIES ----------------------
+
+    /**
+     * Return all pending schedule entries with timestamp >= now.
+     * Used to schedule alarms.
+     */
+    public List<ScheduleEntry> getAllPendingEntries() {
         List<ScheduleEntry> out = new ArrayList<>();
         SQLiteDatabase db = getReadableDatabase();
-        String selection = S_DATE + ">=? AND " + S_DATE + "<=?";
-        Cursor c = db.query(T_SCH, null, selection, new String[]{startDateIso, endDateIso}, null, null, S_DATE + "," + S_TIME);
-        if (c.moveToFirst()) {
-            do {
-                ScheduleEntry s = new ScheduleEntry();
-                s.id = c.getInt(c.getColumnIndexOrThrow(S_ID));
-                s.medId = c.getInt(c.getColumnIndexOrThrow(S_MED_ID));
-                s.date = c.getString(c.getColumnIndexOrThrow(S_DATE));
-                s.time = c.getString(c.getColumnIndexOrThrow(S_TIME));
-                s.timestamp = c.getLong(c.getColumnIndexOrThrow(S_TIMESTAMP));
-                s.status = c.getString(c.getColumnIndexOrThrow(S_STATUS));
-                out.add(s);
-            } while (c.moveToNext());
+        long now = System.currentTimeMillis();
+
+        Cursor c = db.query(T_SCH, null,
+                S_STATUS + "=? AND " + S_TIMESTAMP + ">=?",
+                new String[]{"PENDING", String.valueOf(now)},
+                null, null, S_TIMESTAMP + " ASC");
+
+        if (c != null) {
+            if (c.moveToFirst()) {
+                do out.add(cursorToSchedule(c));
+                while (c.moveToNext());
+            }
+            c.close();
         }
-        c.close();
         return out;
     }
 
+    /**
+     * Get schedule entries between start and end (inclusive), ordered by date,time.
+     * Useful for TimetableActivity list for date range.
+     */
+    public List<ScheduleEntry> getScheduleForWeek(String startDateIso, String endDateIso) {
+        List<ScheduleEntry> out = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+        String sel = S_DATE + ">=? AND " + S_DATE + "<=?";
+        Cursor c = db.query(T_SCH, null, sel, new String[]{startDateIso, endDateIso}, null, null, S_DATE + "," + S_TIME);
+        if (c != null) {
+            if (c.moveToFirst()) {
+                do out.add(cursorToSchedule(c));
+                while (c.moveToNext());
+            }
+            c.close();
+        }
+        return out;
+    }
+
+    /**
+     * Get all entries for a single ISO date (yyyy-MM-dd) ordered by time asc.
+     * Used by TimetableActivity day rendering.
+     */
+    public List<ScheduleEntry> getScheduleForDate(String dateIso) {
+        List<ScheduleEntry> list = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+
+        Cursor c = db.query(T_SCH, null, S_DATE + "=?", new String[]{dateIso}, null, null, S_TIME + " ASC");
+        if (c != null) {
+            if (c.moveToFirst()) {
+                do list.add(cursorToSchedule(c));
+                while (c.moveToNext());
+            }
+            c.close();
+        }
+        return list;
+    }
+
+    /**
+     * Get single schedule entry by id.
+     * Used by ConfirmationActivity, SnoozeReceiver, BootReceiver etc.
+     */
+    public ScheduleEntry getScheduleEntryById(int scheduleId) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.query(T_SCH, null, S_ID + "=?", new String[]{String.valueOf(scheduleId)}, null, null, null);
+        if (c != null) {
+            if (c.moveToFirst()) {
+                ScheduleEntry s = cursorToSchedule(c);
+                c.close();
+                return s;
+            }
+            c.close();
+        }
+        return null;
+    }
+
+    // ---------------------- STATUS UPDATES ----------------------
+
+    /**
+     * Mark an entry as TAKEN
+     */
     public void markTaken(int scheduleId) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues v = new ContentValues();
@@ -293,6 +367,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.update(T_SCH, v, S_ID + "=?", new String[]{String.valueOf(scheduleId)});
     }
 
+    /**
+     * Mark an entry as MISSED
+     */
     public void markMissed(int scheduleId) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues v = new ContentValues();
@@ -300,52 +377,37 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.update(T_SCH, v, S_ID + "=?", new String[]{String.valueOf(scheduleId)});
     }
 
-    private void deleteFutureScheduleForMed(int medId) {
-        SQLiteDatabase db = getWritableDatabase();
-        long now = System.currentTimeMillis();
-        db.delete(T_SCH, S_MED_ID + "=? AND " + S_TIMESTAMP + ">=?", new String[]{String.valueOf(medId), String.valueOf(now)});
+    // ---------------------- UTIL ----------------------
+
+    private ScheduleEntry cursorToSchedule(Cursor c) {
+        ScheduleEntry s = new ScheduleEntry();
+        s.id = c.getInt(c.getColumnIndexOrThrow(S_ID));
+        s.medId = c.getInt(c.getColumnIndexOrThrow(S_MED_ID));
+        s.date = c.getString(c.getColumnIndexOrThrow(S_DATE));
+        s.time = c.getString(c.getColumnIndexOrThrow(S_TIME));
+        s.timestamp = c.getLong(c.getColumnIndexOrThrow(S_TIMESTAMP));
+        s.status = c.getString(c.getColumnIndexOrThrow(S_STATUS));
+        s.foodTiming = c.getString(c.getColumnIndexOrThrow(S_FOOD));
+        return s;
     }
 
-    // Reschedule all PENDING alarms (used on boot or after app update)
-    public List<ScheduleEntry> getAllPendingEntries() {
-        List<ScheduleEntry> out = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.query(T_SCH, null, S_STATUS + "=?", new String[]{"PENDING"}, null, null, S_TIMESTAMP + " ASC");
-        if (c.moveToFirst()) {
-            do {
-                ScheduleEntry s = new ScheduleEntry();
-                s.id = c.getInt(c.getColumnIndexOrThrow(S_ID));
-                s.medId = c.getInt(c.getColumnIndexOrThrow(S_MED_ID));
-                s.date = c.getString(c.getColumnIndexOrThrow(S_DATE));
-                s.time = c.getString(c.getColumnIndexOrThrow(S_TIME));
-                s.timestamp = c.getLong(c.getColumnIndexOrThrow(S_TIMESTAMP));
-                s.status = c.getString(c.getColumnIndexOrThrow(S_STATUS));
-                out.add(s);
-            } while (c.moveToNext());
-        }
-        c.close();
-        return out;
-    }
+    // ---------------------- DTOs ----------------------
 
-    // Helper inner DTO classes
     public static class MedicineDef {
         public int id;
         public String name;
         public String timesCsv;
-        public String repeatType;
-        public int repeatInterval;
         public int daysBitmap;
-        public int durationDays;
         public String foodTiming;
-        public String severity;
     }
 
     public static class ScheduleEntry {
         public int id;
         public int medId;
-        public String date;
-        public String time;
+        public String date; // yyyy-MM-dd
+        public String time; // HH:mm
         public long timestamp;
-        public String status;
+        public String status; // PENDING/TAKEN/MISSED
+        public String foodTiming;
     }
 }

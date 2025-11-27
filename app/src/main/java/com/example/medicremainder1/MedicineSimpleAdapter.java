@@ -5,57 +5,88 @@ import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 import android.widget.ImageButton;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MedicineSimpleAdapter extends RecyclerView.Adapter<MedicineSimpleAdapter.VH> {
-    private final Context ctx;
+/**
+ * Adapter for listing medicines on the main dashboard.
+ * Shows:
+ *  - medicine name
+ *  - times (CSV)
+ *  - edit button
+ *  - delete button
+ */
+public class MedicineSimpleAdapter extends RecyclerView.Adapter<MedicineSimpleAdapter.MedViewHolder> {
+
+    private Context context;
     private List<DatabaseHelper.MedicineDef> list = new ArrayList<>();
+    private DatabaseHelper db;
 
-    public MedicineSimpleAdapter(Context ctx) { this.ctx = ctx; }
+    public MedicineSimpleAdapter(Context ctx) {
+        this.context = ctx;
+        this.db = new DatabaseHelper(ctx);
+    }
 
-    public void setList(List<DatabaseHelper.MedicineDef> l) { this.list = l; notifyDataSetChanged(); }
+    public void setList(List<DatabaseHelper.MedicineDef> data) {
+        this.list = data != null ? data : new ArrayList<>();
+        notifyDataSetChanged();
+    }
 
     @NonNull
     @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(ctx).inflate(R.layout.item_medicine_simple, parent, false);
-        return new VH(v);
+    public MedViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View v = LayoutInflater.from(context)
+                .inflate(R.layout.medicine_item, parent, false);
+        return new MedViewHolder(v);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull VH holder, int position) {
+    public void onBindViewHolder(@NonNull MedViewHolder holder, int position) {
         DatabaseHelper.MedicineDef m = list.get(position);
-        holder.name.setText(m.name);
-        holder.times.setText(m.timesCsv);
-        holder.btnEdit.setOnClickListener(v -> {
-            Intent i = new Intent(ctx, EditMedicineActivity.class);
+
+        holder.nameTv.setText(m.name);
+        holder.timeTv.setText("Times: " + m.timesCsv);
+
+        // --- Edit button ---
+        holder.editBtn.setOnClickListener(v -> {
+            Intent i = new Intent(context, EditMedicineActivity.class);
             i.putExtra("med_id", m.id);
-            ctx.startActivity(i);
+            context.startActivity(i);
         });
-        holder.btnDelete.setOnClickListener(v -> {
-            DatabaseHelper db = new DatabaseHelper(ctx);
+
+        // --- Delete button ---
+        holder.deleteBtn.setOnClickListener(v -> {
             db.deleteMedicine(m.id);
-            setList(db.getAllMedicines());
+            list.remove(position);
+            notifyItemRemoved(position);
+            notifyItemRangeChanged(position, list.size());
         });
     }
 
-    @Override public int getItemCount() { return list.size(); }
+    @Override
+    public int getItemCount() {
+        return list.size();
+    }
 
-    static class VH extends RecyclerView.ViewHolder {
-        TextView name, times;
-        ImageButton btnEdit, btnDelete;
-        VH(View itemView) {
+    static class MedViewHolder extends RecyclerView.ViewHolder {
+
+        TextView nameTv, timeTv;
+        ImageButton editBtn, deleteBtn;
+
+        public MedViewHolder(@NonNull View itemView) {
             super(itemView);
-            name = itemView.findViewById(R.id.itemName);
-            times = itemView.findViewById(R.id.itemTimes);
-            btnEdit = itemView.findViewById(R.id.btnEdit);
-            btnDelete = itemView.findViewById(R.id.btnDelete);
+
+            nameTv = itemView.findViewById(R.id.medicineName);
+            timeTv = itemView.findViewById(R.id.medicineTime);
+
+            editBtn = itemView.findViewById(R.id.editButton);
+            deleteBtn = itemView.findViewById(R.id.deleteButton);
         }
     }
 }
