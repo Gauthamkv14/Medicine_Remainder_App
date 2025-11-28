@@ -40,12 +40,38 @@ public class ConfirmationActivity extends AppCompatActivity {
             confirmText.setText("Did you take " + medName + " at " + s.time + " ?");
         }
 
+        // ----------------------------
+        // YES -> mark taken + stop alarm
+        // ----------------------------
         btnTaken.setOnClickListener(v -> {
+
+            // STOP ALARM SOUND
+            try {
+                if (AlarmReceiver.player != null) {
+                    AlarmReceiver.player.stop();
+                    AlarmReceiver.player.release();
+                    AlarmReceiver.player = null;
+                }
+            } catch (Exception ignored) {}
+
             db.markTaken(scheduleId);
             finish();
         });
 
+        // ----------------------------------
+        // NO -> mark missed + stop alarm
+        // ----------------------------------
         btnNot.setOnClickListener(v -> {
+
+            // STOP ALARM SOUND
+            try {
+                if (AlarmReceiver.player != null) {
+                    AlarmReceiver.player.stop();
+                    AlarmReceiver.player.release();
+                    AlarmReceiver.player = null;
+                }
+            } catch (Exception ignored) {}
+
             db.markMissed(scheduleId);
             finish();
         });

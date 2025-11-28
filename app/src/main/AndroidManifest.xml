@@ -52,7 +52,7 @@
         <!-- Fired exactly at medicine time -->
         <receiver
             android:name=".AlarmReceiver"
-            android:exported="false"/>
+            android:exported="true"/>
 
         <!-- Fired 30 minutes later to mark MISSED if still PENDING -->
         <receiver
@@ -62,7 +62,7 @@
         <!-- Optional snooze receiver -->
         <receiver
             android:name=".SnoozeReceiver"
-            android:exported="false"/>
+            android:exported="true"/>
 
         <!-- Re-registers all alarms after device reboot -->
         <receiver
