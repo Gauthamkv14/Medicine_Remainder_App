@@ -26,7 +26,6 @@ public class TimetableAdapter extends RecyclerView.Adapter<TimetableAdapter.VH> 
     private final SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
     private final SimpleDateFormat pretty = new SimpleDateFormat("EEE, d MMM yyyy", Locale.getDefault());
 
-    // ordered keys and map
     private final List<String> dates = new ArrayList<>();
     private final LinkedHashMap<String, List<DatabaseHelper.ScheduleEntry>> byDate = new LinkedHashMap<>();
 
@@ -49,7 +48,7 @@ public class TimetableAdapter extends RecyclerView.Adapter<TimetableAdapter.VH> 
                 lst.add(s);
             }
         }
-        // ensure we show days even if there are no entries? (DB returns only dates that have entries).
+        // ensure we show days even if there are no entries? (DB returns only dates that have entries)
         notifyDataSetChanged();
     }
 

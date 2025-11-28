@@ -71,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
             if (!am.canScheduleExactAlarms()) {
-                return;  // <-- DO NOT CRASH
+                return;
             }
         }
 

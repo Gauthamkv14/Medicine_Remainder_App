@@ -44,7 +44,6 @@ public class AlarmScheduler {
                 calendar.add(Calendar.DAY_OF_YEAR, 1);
             }
 
-            // --- FIX APPLIED HERE ---
             // Check for exact alarm permission before scheduling
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
@@ -103,7 +102,6 @@ public class AlarmScheduler {
 
         long snoozeTime = System.currentTimeMillis() + (minutes * 60 * 1000);
 
-        // --- FIX APPLIED HERE ---
         // Check for exact alarm permission before scheduling
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (alarmManager.canScheduleExactAlarms()) {

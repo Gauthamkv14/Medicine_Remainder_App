@@ -57,16 +57,16 @@ public class AlarmReceiver extends BroadcastReceiver {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        // 🔔 Notification with Actions
+        // Notification with Actions
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_pill)    // ← use your icon
+                .setSmallIcon(R.drawable.ic_pill)
                 .setContentTitle("Time to take: " + medName)
                 .setContentText("Scheduled at " + time)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(openPi)
-                .addAction(R.drawable.ic_snooze, "SNOOZE", snoozePi)  // 🔥 RESTORED
-                .addAction(R.drawable.ic_done, "TAKEN", openPi);      // optional
+                .addAction(R.drawable.ic_snooze, "SNOOZE", snoozePi)
+                .addAction(R.drawable.ic_done, "TAKEN", openPi);
 
         nm.notify(scheduleId, builder.build());
     }
